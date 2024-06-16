@@ -1,3 +1,6 @@
+import Line from "./line.js";
+import Cluster from "./cluster.js";
+
 class Canvas {
     constructor (canvasNodeId) {
         this.canvas = document.getElementById(canvasNodeId);
@@ -5,6 +8,8 @@ class Canvas {
         this.isDrawing = false
         this.inactivityTimeout = null;
         this.rect = this.canvas.getBoundingClientRect();
+        this.currentLine = null;
+        this.cluster = null;
 
         // Bind methods to the instance
         this.bindMethod();
@@ -31,6 +36,11 @@ class Canvas {
     }
 
     startDrawing (e) {
+        if (!this.cluster) {
+            this.cluster = new Cluster();
+            this.currentLine = new Line();
+        }
+
         this.isDrawing = true
         this.draw(e)
         this.clearInactivityTimeout();
@@ -50,6 +60,8 @@ class Canvas {
         this.context.stroke();
         this.context.beginPath();
         this.context.moveTo(x, y);
+
+        this.currentLine.add(x, y);
     }
 
     stopDrawingOut () {
@@ -60,17 +72,34 @@ class Canvas {
     stopDrawingUp () {
         this.stopDrawingOut()
         this.setInactivityTimeout();
+        this.cluster.add(this.currentLine);
+        this.currentLine = new Line();
     }
 
     clearCanvas() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.clearInactivityTimeout();
     }
+
+    async sendClusterToServer(cluster) {
+        const res = await fetch('/insert_cluster', {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(cluster)
+        })
+
+        const data = await res.json()
+
+        console.log(data)
+    }
     
     setInactivityTimeout() {
         this.clearInactivityTimeout();
         this.inactivityTimeout = setTimeout(() => {
-            console.log('call api')
+            this.sendClusterToServer(this.cluster.getLines)
+            this.cluster = null;
         }, 1000);
     }
 
